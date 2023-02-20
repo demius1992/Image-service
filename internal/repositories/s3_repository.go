@@ -33,17 +33,11 @@ func NewS3Repository(region, bucket string) *S3Repository {
 	}
 }
 
-// UploadFile uploads a file to S3.
-func (r *S3Repository) UploadFile(name string, contentType string, data io.Reader) (string, error) {
-	// Generate a unique ID for the file
-	id, err := uuid.NewRandom()
-	if err != nil {
-		return "", err
-	}
-
+// UploadImage uploads a file to S3.
+func (r *S3Repository) UploadImage(id uuid.UUID, contentType string, data io.Reader) (string, error) {
 	// Read the data from the io.Reader into a bytes.Buffer
 	var buf bytes.Buffer
-	_, err = buf.ReadFrom(data)
+	_, err := buf.ReadFrom(data)
 	if err != nil {
 		return "", err
 	}
@@ -62,7 +56,17 @@ func (r *S3Repository) UploadFile(name string, contentType string, data io.Reade
 		return "", err
 	}
 
-	return id.String(), nil
+	// Generate a pre-signed URL for the uploaded file
+	req, _ := r.svc.GetObjectRequest(&s3.GetObjectInput{
+		Bucket: aws.String(r.bucket),
+		Key:    aws.String(id.String()),
+	})
+	url, err := req.Presign(time.Hour)
+	if err != nil {
+		return "", err
+	}
+
+	return url, nil
 }
 
 // GetFile retrieves a file from S3.

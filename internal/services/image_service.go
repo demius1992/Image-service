@@ -38,7 +38,7 @@ func (s *ImageService) UploadImage(image io.Reader, contentType string) (*models
 	}
 
 	// Upload the original image to S3
-	originalImageURL, err := s.s3Repo.UploadImage(id, "original", contentType, imageData)
+	originalImageURL, err := s.s3Repo.UploadImage(id, contentType, imageData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to upload the original image to S3: %v", err)
 	}
