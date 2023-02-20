@@ -41,11 +41,21 @@ func (r *S3Repository) UploadFile(name string, contentType string, data io.Reade
 		return "", err
 	}
 
+	// Read the data from the io.Reader into a bytes.Buffer
+	var buf bytes.Buffer
+	_, err = buf.ReadFrom(data)
+	if err != nil {
+		return "", err
+	}
+
+	// Create an io.ReadSeeker interface from the bytes.Buffer
+	body := bytes.NewReader(buf.Bytes())
+
 	// Upload the file to S3
 	_, err = r.svc.PutObject(&s3.PutObjectInput{
 		Bucket:      aws.String(r.bucket),
 		Key:         aws.String(id.String()),
-		Body:        data,
+		Body:        body,
 		ContentType: aws.String(contentType),
 	})
 	if err != nil {
