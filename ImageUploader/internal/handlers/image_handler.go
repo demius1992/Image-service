@@ -1,27 +1,29 @@
 package handlers
 
 import (
+	"bytes"
+	"github.com/demius1992/Image-service/ImageUploader/internal/interfaces"
+	"github.com/demius1992/Image-service/ImageUploader/internal/models"
+	"github.com/google/uuid"
 	"net/http"
 
-	"github.com/demius1992/Image-service/internal/models"
-	"github.com/demius1992/Image-service/internal/services"
 	"github.com/gin-gonic/gin"
 )
 
-// ImageHandler handles the image-related endpoints.
-type ImageHandler struct {
-	imageService services.ImageService
+// ImageHandle handles the image-related endpoints.
+type ImageHandle struct {
+	imageService interfaces.ImageHandler
 }
 
-// NewImageHandler creates a new ImageHandler instance.
-func NewImageHandler(imageService services.ImageService) *ImageHandler {
-	return &ImageHandler{
-		imageService: imageService,
+// NewImageHandler creates a new ImageHandle instance.
+func NewImageHandler(imageHandler interfaces.ImageHandler) *ImageHandle {
+	return &ImageHandle{
+		imageService: imageHandler,
 	}
 }
 
 // UploadImage handles the image upload endpoint.
-func (h *ImageHandler) UploadImage(c *gin.Context) {
+func (h *ImageHandle) UploadImage(c *gin.Context) {
 	// Get the image file from the request
 	file, err := c.FormFile("image")
 	if err != nil {
@@ -54,23 +56,28 @@ func (h *ImageHandler) UploadImage(c *gin.Context) {
 }
 
 // GetImage handles the image retrieval endpoint.
-func (h *ImageHandler) GetImage(c *gin.Context) {
+func (h *ImageHandle) GetImage(c *gin.Context) {
 	// Get the image ID from the request URL
 	id := c.Param("id")
 
+	fromBytes, err := uuid.FromBytes([]byte(id))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id parameter"})
+		return
+	}
 	// Retrieve the image from S3
-	image, err := h.imageService.GetImage(id)
+	image, err := h.imageService.GetImage(fromBytes)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retrieve the image"})
 		return
 	}
 
 	// Return the image as the response
-	c.DataFromReader(http.StatusOK, image.ContentType, image.Size, image.Content)
+	c.DataFromReader(http.StatusOK, image.Size, image.ContentType, bytes.NewReader(image.Content), make(map[string]string))
 }
 
 // GetImageVariants handles the image variant retrieval endpoint.
-func (h *ImageHandler) GetImageVariants(c *gin.Context) {
+func (h *ImageHandle) GetImageVariants(c *gin.Context) {
 	// Get the image ID from the request URL
 	id := c.Param("id")
 
@@ -85,8 +92,8 @@ func (h *ImageHandler) GetImageVariants(c *gin.Context) {
 	imageVariantResponses := make([]models.Image, len(imageVariants))
 	for i, imageVariant := range imageVariants {
 		imageVariantResponses[i] = models.Image{
-			Title:    imageVariant.Name,
-			ImageURL: imageVariant.URL,
+			Name: imageVariant.Name,
+			URL:  imageVariant.URL,
 		}
 	}
 

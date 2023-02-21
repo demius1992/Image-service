@@ -2,20 +2,18 @@ package config
 
 import (
 	"fmt"
-	"log"
-	"strings"
-
 	"github.com/spf13/viper"
+	"log"
 )
 
 // Config represents the application configuration.
 type Config struct {
-	Host         string
-	Port         string
-	AwsRegion    string
-	AwsBucket    string
-	KafkaBrokers []string
-	KafkaTopic   string
+	Host         string   `mapstructure:"host"`
+	Port         string   `mapstructure:"port"`
+	AwsRegion    string   `mapstructure:"aws_region"`
+	AwsBucket    string   `mapstructure:"aws_bucket"`
+	KafkaBrokers []string `mapstructure:"kafka_brokers"`
+	KafkaTopic   string   `mapstructure:"kafka_topic"`
 }
 
 var conf *Config
@@ -48,23 +46,18 @@ func LoadConfig() (*Config, error) {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
-	viper.AddConfigPath("/etc/image-service/")
+	viper.AddConfigPath("//etc/image-service/ImageUploader/pkg/config/")
 
 	// Load the configuration file
 	if err := viper.ReadInConfig(); err != nil {
 		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
-			return nil, fmt.Errorf("Failed to read config file: %v", err)
+			return nil, fmt.Errorf("failed to read config file: %v", err)
 		}
 	}
 
-	// Bind the environment variables to the configuration
-	viper.SetEnvPrefix("IMAGE_SERVICE")
-	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
-	viper.AutomaticEnv()
-
 	// Override the configuration values with environment variables
 	if err := viper.Unmarshal(&conf); err != nil {
-		return nil, fmt.Errorf("Failed to unmarshal config: %v", err)
+		return nil, fmt.Errorf("failed to unmarshal config: %v", err)
 	}
 
 	return conf, nil

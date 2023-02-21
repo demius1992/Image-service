@@ -2,14 +2,13 @@ package main
 
 import (
 	"fmt"
+	"github.com/demius1992/Image-service/ImageUploader/internal/handlers"
+	"github.com/demius1992/Image-service/ImageUploader/internal/repositories"
+	"github.com/demius1992/Image-service/ImageUploader/internal/services"
+	"github.com/demius1992/Image-service/ImageUploader/pkg/config"
+	"github.com/gin-gonic/gin"
 	"log"
 	"net/http"
-
-	"github.com/demius1992/Image-service/internal/handlers"
-	"github.com/demius1992/Image-service/internal/repositories"
-	"github.com/demius1992/Image-service/internal/services"
-	"github.com/demius1992/Image-service/pkg/config"
-	"github.com/gin-gonic/gin"
 )
 
 func main() {
@@ -19,15 +18,14 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
+	log.Printf(conf.AwsRegion)
+
 	// Initialize the S3 repositories
 	s3Repo := repositories.NewS3Repository(conf.AwsRegion, conf.AwsBucket)
 
-	// Initialize the Kafka repositories
-	kafkaRepo := repositories.NewKafkaRepository(conf.KafkaBrokers, conf.KafkaTopic)
-
 	// Initialize the services
-	imageService := services.NewImageService(s3Repo, kafkaRepo)
-	kafkaService := services.NewKafkaService(kafkaRepo)
+	kafkaService := services.NewKafkaService(conf.KafkaBrokers, conf.KafkaTopic)
+	imageService := services.NewImageService(s3Repo, kafkaService)
 
 	// Initialize the handlers
 	imageHandler := handlers.NewImageHandler(imageService)
