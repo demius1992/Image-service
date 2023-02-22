@@ -13,18 +13,18 @@ import (
 
 func main() {
 	// Load the configuration
-	conf, err := config.LoadConfig()
+	cfg, err := config.LoadConfig()
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	log.Printf(conf.AwsRegion)
+	log.Printf(cfg.AwsRegion)
 
 	// Initialize the S3 repositories
-	s3Repo := repositories.NewS3Repository(conf.AwsRegion, conf.AwsBucket)
+	s3Repo := repositories.NewS3Repository(cfg.AwsRegion, cfg.AwsBucket)
 
 	// Initialize the services
-	kafkaService := services.NewKafkaService(conf.KafkaBrokers, conf.KafkaTopic)
+	kafkaService := services.NewKafkaService(cfg.KafkaBrokers, cfg.KafkaTopic)
 	imageService := services.NewImageService(s3Repo, kafkaService)
 
 	// Initialize the handlers
@@ -35,14 +35,18 @@ func main() {
 	router := gin.Default()
 
 	// Register the HTTP endpoints
+	router.GET("/health", func(c *gin.Context) {
+		c.String(http.StatusOK, "OK")
+	})
+
 	router.POST("/images", imageHandler.UploadImage)
 	router.GET("/images/:id", imageHandler.GetImage)
 	router.GET("/images/:id/variants", imageHandler.GetImageVariants)
 	router.GET("/messages", messageHandler.GetMessages)
 
 	// Start the HTTP server
-	addr := fmt.Sprintf("%s:%s", conf.Host, conf.Port)
-	if err := http.ListenAndServe(addr, router); err != nil {
+	addr := fmt.Sprintf("%s:%s", cfg.Host, cfg.Port)
+	if err = router.Run(addr); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
 }

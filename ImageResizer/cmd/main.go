@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -70,8 +71,9 @@ func main() {
 	})
 
 	// Start the server
-	err = router.Run(cfg.ServerAddress)
-	if err != nil {
+	addr := fmt.Sprintf("%s:%s", cfg.Host, cfg.Port)
+	if err = router.Run(addr); err != nil {
 		log.Fatalf("Failed to start server: %v", err)
 	}
+
 }

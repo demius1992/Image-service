@@ -27,6 +27,5 @@ type S3Interractor interface {
 	UploadImage(id uuid.UUID, contentType string, data io.Reader) (string, error)
 	GetImage(id uuid.UUID, variantName string) (*models.Image, error)
 	GetImageVariants(id string) ([]*models.Image, error)
-	DeleteFile(id string) error
 	GetSignedURL(key string, duration time.Duration) (string, error)
 }

@@ -72,11 +72,12 @@ func (r *S3Repository) GetImage(id uuid.UUID, variantName string) (*models.Image
 	// Retrieve the variant from S3
 	resp, err := r.svc.GetObject(&s3.GetObjectInput{
 		Bucket: aws.String(r.bucket),
-		Key:    aws.String(id.String() + "/" + variantName),
+		Key:    aws.String(id.String()),
 	})
 	if err != nil {
 		return nil, err
 	}
+	defer resp.Body.Close()
 
 	// Read the variant content
 	buf := new(bytes.Buffer)
@@ -144,15 +145,6 @@ func (r *S3Repository) GetImageVariants(id string) ([]*models.Image, error) {
 	}
 
 	return variants, nil
-}
-
-// DeleteFile deletes a file from S3.
-func (r *S3Repository) DeleteFile(id string) error {
-	_, err := r.svc.DeleteObject(&s3.DeleteObjectInput{
-		Bucket: aws.String(r.bucket),
-		Key:    aws.String(id),
-	})
-	return err
 }
 
 // GetSignedURL is a function used to generate a signed URL for a file stored in S3.

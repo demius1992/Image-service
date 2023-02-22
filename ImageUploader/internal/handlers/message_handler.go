@@ -18,8 +18,9 @@ func NewMessageHandler(kafkaService interfaces.KafkaService) *MessageHandler {
 	}
 }
 
+// GetMessages gets the messages from the Kafka service
 func (h *MessageHandler) GetMessages(c *gin.Context) {
-	// Get the messages from the Kafka service
+
 	messages, err := h.kafkaService.GetMessages(c)
 	if err != nil {
 		log.Printf("Failed to get messages: %v", err)

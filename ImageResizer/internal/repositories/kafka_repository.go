@@ -9,12 +9,14 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
+// KafkaRepository is a repository that implements the image service methods using Apache Kafka as the message broker
 type KafkaRepository struct {
 	consumer *kafka.Reader
 	producer *kafka.Writer
 	topic    string
 }
 
+// NewKafkaRepository returns a new instance of KafkaRepository
 func NewKafkaRepository(brokers []string, topic string) *KafkaRepository {
 	return &KafkaRepository{
 		consumer: kafka.NewReader(kafka.ReaderConfig{
@@ -32,6 +34,7 @@ func NewKafkaRepository(brokers []string, topic string) *KafkaRepository {
 	}
 }
 
+// ConsumeImageEvents consumes image events from Kafka and processes them using the given ImageService
 func (r *KafkaRepository) ConsumeImageEvents(ctx context.Context, imageService ImageService) {
 	for {
 		message, err := r.consumer.FetchMessage(ctx)
@@ -111,6 +114,7 @@ func (r *KafkaRepository) ConsumeImageEvents(ctx context.Context, imageService I
 	}
 }
 
+// PublishImageCreatedEvent publishes an image created event to Kafka
 func (r *KafkaRepository) PublishImageCreatedEvent(ctx context.Context, imageID uuid.UUID, imageURL string) error {
 	event := map[string]interface{}{
 		"type":      "image_created",
@@ -134,6 +138,7 @@ func (r *KafkaRepository) PublishImageCreatedEvent(ctx context.Context, imageID 
 	return nil
 }
 
+// PublishImageResizedEvent publishes the image_resized event to the Kafka topic
 func (r *KafkaRepository) PublishImageResizedEvent(ctx context.Context, imageID uuid.UUID, imageResizedURL string) error {
 	event := map[string]interface{}{
 		"type":          "image_resized",
