@@ -69,6 +69,6 @@ func (s *ImageService) GetImage(id uuid.UUID) (*models.Image, error) {
 }
 
 // GetImageVariants retrieves the image variants from S3.
-func (s *ImageService) GetImageVariants(id string) ([]*models.Image, error) {
-	return s.s3Repo.GetImageVariants(id)
+func (s *ImageService) GetImageVariants(ids []string) ([]*models.Image, error) {
+	return s.s3Repo.GetImageVariants(ids)
 }

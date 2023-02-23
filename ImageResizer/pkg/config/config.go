@@ -40,20 +40,17 @@ func LoadConfig() (*Config, error) {
 	viper.SetConfigName("config")
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
-	viper.AddConfigPath("/etc/image-service/ImageResizer/pkg/config")
+	viper.AddConfigPath("//etc/image-service/ImageResizer/pkg/config")
 
 	// Load the configuration file
-	err := viper.ReadInConfig()
-	if err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			log.Println("Configuration file not found")
-		} else {
-			log.Printf("Failed to read configuration file: %v", err)
+	if err := viper.ReadInConfig(); err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			return nil, fmt.Errorf("failed to read config file: %v", err)
 		}
 	}
 
 	// Unmarshal the configuration
-	err = viper.Unmarshal(&conf)
+	err := viper.Unmarshal(&conf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal configuration: %v", err)
 	}

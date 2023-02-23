@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"github.com/demius1992/Image-service/ImageUploader/internal/models"
 	"io"
-	"strings"
+	"log"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -55,11 +55,12 @@ func (r *S3Repository) UploadImage(id uuid.UUID, contentType string, data io.Rea
 		ContentType: aws.String(contentType),
 	})
 	if err != nil {
+		log.Println(err)
 		return "", err
 	}
 
 	// Generate a pre-signed URL for the uploaded file
-	url, err := r.GetSignedURL(id.String(), time.Hour)
+	url, err := r.getSignedURL(id.String(), time.Hour)
 	if err != nil {
 		return "", err
 	}
@@ -86,10 +87,15 @@ func (r *S3Repository) GetImage(id uuid.UUID, variantName string) (*models.Image
 		return nil, err
 	}
 
+	url, err := r.getSignedURL(id.String(), time.Hour)
+	if err != nil {
+		return nil, err
+	}
+
 	// Create and return the image variant model
 	image := &models.Image{
 		Name:        variantName,
-		URL:         resp.String(), // use the Object URL as the variant URL
+		URL:         url, // use the Object URL as the variant URL
 		ContentType: *resp.ContentType,
 		Size:        *resp.ContentLength,
 		Content:     buf.Bytes(),
@@ -97,58 +103,49 @@ func (r *S3Repository) GetImage(id uuid.UUID, variantName string) (*models.Image
 	return image, nil
 }
 
-func (r *S3Repository) GetImageVariants(id string) ([]*models.Image, error) {
+func (r *S3Repository) GetImageVariants(ids []string) ([]*models.Image, error) {
 	// Create a slice to hold the variants
 	var variants []*models.Image
 
-	// Get the object prefix for the image
-	prefix := id + "/"
+	for _, id := range ids {
 
-	// List the objects in the S3 bucket
-	resp, err := r.svc.ListObjects(&s3.ListObjectsInput{
-		Bucket: aws.String(r.bucket),
-		Prefix: aws.String(prefix),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	// Iterate through the objects and add the variants to the slice
-	for _, obj := range resp.Contents {
-		// Skip the original image
-		if *obj.Key == prefix+"original" {
-			continue
-		}
-
-		// Get the variant content type
-		resp, err := r.svc.HeadObject(&s3.HeadObjectInput{
+		// Retrieve the variant from S3
+		resp, err := r.svc.GetObject(&s3.GetObjectInput{
 			Bucket: aws.String(r.bucket),
-			Key:    obj.Key,
+			Key:    aws.String(id),
 		})
 		if err != nil {
 			return nil, err
 		}
+		defer resp.Body.Close()
 
-		url, err := r.GetSignedURL(*obj.Key, time.Hour)
+		// Read the variant content
+		buf := new(bytes.Buffer)
+		_, err = buf.ReadFrom(resp.Body)
 		if err != nil {
 			return nil, err
 		}
 
-		// Add the variant to the slice
-		variants = append(variants, &models.Image{
-			Name:        strings.TrimPrefix(*obj.Key, prefix),
-			URL:         url,
+		url, err := r.getSignedURL(id, time.Hour)
+		if err != nil {
+			return nil, err
+		}
+
+		// Create and return the image variant model
+		image := &models.Image{
+			URL:         url, // use the Object URL as the variant URL
 			ContentType: *resp.ContentType,
-			Size:        *obj.Size,
-			Content:     nil,
-		})
+			Size:        *resp.ContentLength,
+			Content:     buf.Bytes(),
+		}
+		variants = append(variants, image)
 	}
 
 	return variants, nil
 }
 
-// GetSignedURL is a function used to generate a signed URL for a file stored in S3.
-func (r *S3Repository) GetSignedURL(key string, duration time.Duration) (string, error) {
+// getSignedURL is a function used to generate a signed URL for a file stored in S3.
+func (r *S3Repository) getSignedURL(key string, duration time.Duration) (string, error) {
 	req, _ := r.svc.GetObjectRequest(&s3.GetObjectInput{
 		Bucket: aws.String(r.bucket),
 		Key:    aws.String(key),

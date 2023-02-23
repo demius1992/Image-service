@@ -8,6 +8,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/demius1992/Image-service/ImageResizer/internal/models"
 	"github.com/google/uuid"
+	"github.com/segmentio/kafka-go"
 	"net/http"
 	"time"
 )
@@ -34,10 +35,11 @@ func NewS3Repository(bucket string, region string) (*S3Repository, error) {
 }
 
 // GetImage downloads an image from S3 using the provided image ID
-func (r *S3Repository) GetImage(imageID uuid.UUID) (*models.Image, error) {
+func (r *S3Repository) GetImage(message *kafka.Message) (*models.Image, error) {
+	imageID := message.Value
 	result, err := r.svc.GetObject(&s3.GetObjectInput{
 		Bucket: aws.String(r.bucket),
-		Key:    aws.String(imageID.String()),
+		Key:    aws.String(string(imageID)),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to download image: %v", err)
@@ -63,8 +65,10 @@ func (r *S3Repository) GetImage(imageID uuid.UUID) (*models.Image, error) {
 }
 
 // UploadImages uploads an image to S3
-func (r *S3Repository) UploadImages(inputImages []*models.Image) ([]string, error) {
+func (r *S3Repository) UploadImages(inputImages []*models.Image) ([]string, []string, error) {
+	var ids []string
 	var urls []string
+
 	for _, image := range inputImages {
 		id := uuid.New()
 		contentType := http.DetectContentType(image.Content)
@@ -77,21 +81,23 @@ func (r *S3Repository) UploadImages(inputImages []*models.Image) ([]string, erro
 			ContentType: aws.String(contentType),
 		})
 		if err != nil {
-			return []string{""}, fmt.Errorf("failed to upload image: %v", err)
+			return []string{""}, []string{""}, fmt.Errorf("failed to upload image: %v", err)
 		}
 
-		url, err := r.GetSignedURL(id.String(), time.Hour)
+		url, err := r.getSignedURL(id.String(), time.Hour)
 		if err != nil {
-			return []string{""}, err
+			return []string{""}, []string{""}, err
 		}
+
+		ids = append(ids, id.String())
 		urls = append(urls, url)
 	}
 
-	return urls, nil
+	return ids, urls, nil
 }
 
-// GetSignedURL is a function used to generate a signed URL for a file stored in S3.
-func (r *S3Repository) GetSignedURL(key string, duration time.Duration) (string, error) {
+// getSignedURL is a function used to generate a signed URL for a file stored in S3.
+func (r *S3Repository) getSignedURL(key string, duration time.Duration) (string, error) {
 	req, _ := r.svc.GetObjectRequest(&s3.GetObjectInput{
 		Bucket: aws.String(r.bucket),
 		Key:    aws.String(key),

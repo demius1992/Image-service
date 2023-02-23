@@ -3,11 +3,9 @@ package services
 import (
 	"context"
 	"github.com/demius1992/Image-service/ImageUploader/internal/interfaces"
-	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/segmentio/kafka-go"
 	"log"
-	"net/http"
 	"time"
 )
 
@@ -39,7 +37,7 @@ func NewKafkaService(brokers []string, topic string) interfaces.KafkaService {
 }
 
 // GetMessages gets messages from Kafka
-func (r *kafkaRepo) GetMessages(c *gin.Context) ([]string, error) {
+func (r *kafkaRepo) GetMessages() ([]string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
@@ -58,13 +56,11 @@ func (r *kafkaRepo) GetMessages(c *gin.Context) ([]string, error) {
 				break
 			}
 			log.Printf("Failed to read message from Kafka: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "Failed to read messages from Kafka",
-			})
 			return []string{""}, err
 		}
 
-		messages = append(messages, string(msg.Value))
+		//Gets ids from message keys
+		messages = append(messages, string(msg.Key))
 	}
 
 	return messages, nil

@@ -5,10 +5,19 @@ import (
 	"github.com/demius1992/Image-service/ImageUploader/internal/interfaces"
 	"github.com/demius1992/Image-service/ImageUploader/internal/models"
 	"github.com/google/uuid"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
+
+const MAX_UPLOAD_SIZE = 5 << 30
+
+type IDs struct {
+	ID1 string `json:"id1"`
+	ID2 string `json:"id2"`
+	ID3 string `json:"id3"`
+}
 
 // ImageHandle handles the image-related endpoints.
 type ImageHandle struct {
@@ -24,26 +33,23 @@ func NewImageHandler(imageHandler interfaces.ImageHandler) *ImageHandle {
 
 // UploadImage handles the image upload endpoint.
 func (h *ImageHandle) UploadImage(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, MAX_UPLOAD_SIZE)
+
 	// Get the image file from the request
-	file, err := c.FormFile("image")
+	file, header, err := c.Request.FormFile("image")
 	if err != nil {
+		log.Println(err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to get the image file from the request"})
 		return
 	}
+	defer file.Close()
 
-	// Open the file
-	imageFile, err := file.Open()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to open the image file"})
-		return
-	}
-	defer imageFile.Close()
-
-	// Get the content type of the image
-	contentType := file.Header.Get("Content-Type")
+	buffer := make([]byte, header.Size)
+	_, _ = file.Read(buffer)
+	contentType := http.DetectContentType(buffer)
 
 	// Upload the image to S3 and publish a message to Kafka
-	image, err := h.imageService.UploadImage(imageFile, contentType)
+	image, err := h.imageService.UploadImage(file, contentType)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload the image"})
 		return
@@ -52,6 +58,7 @@ func (h *ImageHandle) UploadImage(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"id":        image.ID,
 		"createdAt": image.CreatedAt,
+		"url":       image.URL,
 	})
 }
 
@@ -78,11 +85,18 @@ func (h *ImageHandle) GetImage(c *gin.Context) {
 
 // GetImageVariants handles the image variant retrieval endpoint.
 func (h *ImageHandle) GetImageVariants(c *gin.Context) {
-	// Get the image ID from the request URL
-	id := c.Param("id")
+	// Get the image URLs from the request body
+	var data IDs
+
+	if err := c.BindJSON(&data); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to parse image URLs from the request body"})
+		return
+	}
+
+	ids := []string{data.ID1, data.ID2, data.ID3}
 
 	// Retrieve the image variants from S3
-	imageVariants, err := h.imageService.GetImageVariants(id)
+	imageVariants, err := h.imageService.GetImageVariants(ids)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retrieve the image variants"})
 		return

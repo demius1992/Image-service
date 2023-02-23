@@ -2,11 +2,13 @@ package services
 
 import (
 	"bytes"
+	"context"
+	"github.com/demius1992/Image-service/ImageResizer/internal/interfaces"
 	"github.com/demius1992/Image-service/ImageResizer/internal/models"
 	"github.com/nfnt/resize"
-	"github.com/your/package/internal/repositories"
 	"image"
 	"image/jpeg"
+	"log"
 )
 
 type imageSize struct {
@@ -15,14 +17,46 @@ type imageSize struct {
 }
 
 type ImageService struct {
-	s3Repository    repositories.S3Repository
-	kafkaRepository repositories.KafkaRepository
+	kafkaSrv interfaces.KafkaService
+	s3Repo   interfaces.S3RepositoryInterractor
 }
 
-func NewImageService(s3Repository repositories.S3Repository, kafkaRepository repositories.KafkaRepository) *ImageService {
+func NewImageService(kafkaSrv interfaces.KafkaService, s3Repo interfaces.S3RepositoryInterractor) *ImageService {
 	return &ImageService{
-		s3Repository:    s3Repository,
-		kafkaRepository: kafkaRepository,
+		kafkaSrv: kafkaSrv,
+		s3Repo:   s3Repo,
+	}
+}
+
+func (i *ImageService) ImageProcessor(ctx context.Context) error {
+	for {
+		msg, err := i.kafkaSrv.GetMessages(ctx)
+		if err != nil {
+			return err
+		}
+
+		imageResp, err := i.s3Repo.GetImage(msg)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+
+		resizeResp, err := resizeImage(imageResp)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+
+		ids, urls, err := i.s3Repo.UploadImages(resizeResp)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+
+		if err = i.kafkaSrv.SendMessage(ctx, ids, urls); err != nil {
+			log.Println(err)
+			continue
+		}
 	}
 }
 
