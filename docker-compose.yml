@@ -1,57 +1,62 @@
-version: "3"
-
+version: '3'
 services:
   kafka-1:
-    build:
-      context: ./kafka-1
+    image: confluentinc/cp-kafka:latest
     environment:
-      KAFKA_ADVERTISED_HOST_NAME: kafka-1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_BROKER_ID: 1
-    ports:
-      - "9091:9092"
-    volumes:
-      - kafka-1-data:/kafka/data
-
-  kafka-2:
-    build:
-      context: ./kafka-2
-    environment:
-      KAFKA_ADVERTISED_HOST_NAME: kafka-2
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_BROKER_ID: 2
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-1:9092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     ports:
       - "9092:9092"
     volumes:
-      - kafka-2-data:/kafka/data
+      - kafka-1-data:/var/lib/kafka/data
 
-  kafka-3:
-    build:
-      context: ./kafka-3
+  kafka-2:
+    image: confluentinc/cp-kafka:latest
     environment:
-      KAFKA_ADVERTISED_HOST_NAME: kafka-3
+      KAFKA_BROKER_ID: 2
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_BROKER_ID: 3
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-2:9092,PLAINTEXT_HOST://localhost:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
     ports:
       - "9093:9092"
     volumes:
-      - kafka-3-data:/kafka/data
+      - kafka-2-data:/var/lib/kafka/data
+
+  kafka-3:
+    image: confluentinc/cp-kafka:latest
+    environment:
+      KAFKA_BROKER_ID: 3
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-3:9092,PLAINTEXT_HOST://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9094:9092"
+    volumes:
+      - kafka-3-data:/var/lib/kafka/data
 
   zookeeper:
-    image: zookeeper:3.4
+    image: confluentinc/cp-zookeeper:latest
     restart: always
     ports:
       - "2181:2181"
     volumes:
-      - zookeeper-data:/data
+      - zookeeper-data:/var/lib/zookeeper/data
 
   image-uploader:
     build:
       context: ./imageUploader
     environment:
-      S3_REGION: "your_s3_region"
-      S3_BUCKET: "your_s3_bucket"
-      KAFKA_TOPIC: "your_kafka_topic"
+      S3_REGION: "aws_region"
+      S3_BUCKET: "us-east-1"
+      KAFKA_TOPIC: "image_topic"
       KAFKA_BROKERS: "kafka-1:9092,kafka-2:9092,kafka-3:9092"
     depends_on:
       - kafka-1
@@ -64,9 +69,9 @@ services:
     build:
       context: ./imageResizer
     environment:
-      S3_REGION: "your_s3_region"
-      S3_BUCKET: "your_s3_bucket"
-      KAFKA_TOPIC: "your_kafka_topic"
+      S3_REGION: "aws_region"
+      S3_BUCKET: "us-east-1"
+      KAFKA_TOPIC: "image_topic"
       KAFKA_BROKERS: "kafka-1:9092,kafka-2:9092,kafka-3:9092"
     depends_on:
       - kafka-1
