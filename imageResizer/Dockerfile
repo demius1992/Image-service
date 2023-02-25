@@ -4,11 +4,12 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN go build -o imageResizer ./cmd/
+RUN GOOS=linux go build -ldflags="-s -w" -o imageResizer ./cmd/
 
 # Final stage
 FROM alpine:3.14
 RUN apk --no-cache add ca-certificates
 WORKDIR /app
 COPY --from=build /app/imageResizer .
+COPY .env .
 CMD ["./imageResizer"]

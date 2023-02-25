@@ -2,16 +2,23 @@ package handlers
 
 import (
 	"bytes"
-	"github.com/demius1992/Image-service/imageUploader/internal/interfaces"
 	"github.com/demius1992/Image-service/imageUploader/internal/models"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
+	"io"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 )
 
 const MAX_UPLOAD_SIZE = 5 << 30
+
+// ImageHandler provides an interface for interacting with ImageService
+type ImageHandler interface {
+	UploadImage(image io.Reader, contentType string) (*models.Image, error)
+	GetImage(id uuid.UUID) (*models.Image, error)
+	GetImageVariants(ids []string) ([]*models.Image, error)
+}
 
 type IDs struct {
 	ID1 string `json:"id1"`
@@ -21,11 +28,11 @@ type IDs struct {
 
 // ImageHandle handles the image-related endpoints.
 type ImageHandle struct {
-	imageService interfaces.ImageHandler
+	imageService ImageHandler
 }
 
 // NewImageHandler creates a new ImageHandle instance.
-func NewImageHandler(imageHandler interfaces.ImageHandler) *ImageHandle {
+func NewImageHandler(imageHandler ImageHandler) *ImageHandle {
 	return &ImageHandle{
 		imageService: imageHandler,
 	}

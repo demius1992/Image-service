@@ -13,10 +13,11 @@ require (
 
 require (
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
-	github.com/klauspost/compress v1.15.9 // indirect
-	github.com/pierrec/lz4/v4 v4.1.15 // indirect
+	github.com/klauspost/compress v1.15.14 // indirect
+	github.com/pierrec/lz4/v4 v4.1.17 // indirect
 	github.com/stretchr/testify v1.8.1 // indirect
-	golang.org/x/net v0.4.0 // indirect
-	golang.org/x/sys v0.3.0 // indirect
+	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa // indirect
+	golang.org/x/net v0.5.0 // indirect
+	golang.org/x/sys v0.4.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )

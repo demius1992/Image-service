@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"github.com/demius1992/Image-service/imageUploader/internal/interfaces"
 	"github.com/google/uuid"
 	"github.com/segmentio/kafka-go"
 	"github.com/sirupsen/logrus"
@@ -15,7 +14,7 @@ type kafkaRepo struct {
 	topic  string
 }
 
-func NewKafkaService(brokers []string, topic string) interfaces.KafkaService {
+func NewKafkaService(brokers []string, topic string) KafkaService {
 	w := &kafka.Writer{
 		Addr:                   kafka.TCP(brokers...),
 		Topic:                  topic,

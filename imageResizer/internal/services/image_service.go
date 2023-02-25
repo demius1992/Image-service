@@ -3,13 +3,24 @@ package services
 import (
 	"bytes"
 	"context"
-	"github.com/demius1992/Image-service/imageResizer/internal/interfaces"
 	"github.com/demius1992/Image-service/imageResizer/internal/models"
 	"github.com/nfnt/resize"
+	"github.com/segmentio/kafka-go"
+	"github.com/sirupsen/logrus"
 	"image"
 	"image/jpeg"
-	"log"
 )
+
+type KafkaService interface {
+	GetMessages(ctx context.Context) (*kafka.Message, error)
+	SendMessage(ctx context.Context, ids, urls []string) error
+	CreateTopics() error
+}
+
+type S3RepositoryInterractor interface {
+	GetImage(message *kafka.Message) (*models.Image, error)
+	UploadImages(inputImages []*models.Image) ([]string, []string, error)
+}
 
 type imageSize struct {
 	Width  uint
@@ -17,11 +28,11 @@ type imageSize struct {
 }
 
 type ImageService struct {
-	kafkaSrv interfaces.KafkaService
-	s3Repo   interfaces.S3RepositoryInterractor
+	kafkaSrv KafkaService
+	s3Repo   S3RepositoryInterractor
 }
 
-func NewImageService(kafkaSrv interfaces.KafkaService, s3Repo interfaces.S3RepositoryInterractor) *ImageService {
+func NewImageService(kafkaSrv KafkaService, s3Repo S3RepositoryInterractor) *ImageService {
 	return &ImageService{
 		kafkaSrv: kafkaSrv,
 		s3Repo:   s3Repo,
@@ -29,34 +40,45 @@ func NewImageService(kafkaSrv interfaces.KafkaService, s3Repo interfaces.S3Repos
 }
 
 func (i *ImageService) ImageProcessor(ctx context.Context) error {
+	err := i.kafkaSrv.CreateTopics()
+	if err != nil {
+		return err
+	}
+
+	logrus.Println("start processing")
 	for {
 		msg, err := i.kafkaSrv.GetMessages(ctx)
 		if err != nil {
-			return err
+			if err.Error() != "EOF" { // Check if error is not EOF
+				return err
+			}
+			//logrus.Println("Waiting for messages...")
+			continue // Keep waiting for messages if EOF
+		}
+
+		if len(msg.Key) <= 0 && len(msg.Value) <= 0 {
+			continue
 		}
 
 		imageResp, err := i.s3Repo.GetImage(msg)
 		if err != nil {
-			log.Println(err)
-			continue
+			return err
 		}
 
 		resizeResp, err := resizeImage(imageResp)
 		if err != nil {
-			log.Println(err)
-			continue
+			return err
 		}
 
 		ids, urls, err := i.s3Repo.UploadImages(resizeResp)
 		if err != nil {
-			log.Println(err)
-			continue
+			return err
 		}
 
 		if err = i.kafkaSrv.SendMessage(ctx, ids, urls); err != nil {
-			log.Println(err)
-			continue
+			return err
 		}
+
 	}
 }
 

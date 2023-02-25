@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/demius1992/Image-service/imageUploader/internal/interfaces"
 	"github.com/demius1992/Image-service/imageUploader/internal/models"
 	"io"
 	"time"
@@ -12,14 +11,27 @@ import (
 	"github.com/google/uuid"
 )
 
+// KafkaService provides an interface for interacting with Kafka.
+type KafkaService interface {
+	SendMessage(ctx context.Context, id uuid.UUID) error
+	GetMessages() ([]string, error)
+}
+
+// S3Interractor provides an interface for interacting with s3Repository
+type S3Interractor interface {
+	UploadImage(id uuid.UUID, contentType string, data io.Reader) (string, error)
+	GetImage(id uuid.UUID, variantName string) (*models.Image, error)
+	GetImageVariants(ids []string) ([]*models.Image, error)
+}
+
 // ImageService handles the image-related operations.
 type ImageService struct {
-	s3Repo   interfaces.S3Interractor
-	kafkaSrv interfaces.KafkaService
+	s3Repo   S3Interractor
+	kafkaSrv KafkaService
 }
 
 // NewImageService creates a new ImageService instance.
-func NewImageService(s3Repo interfaces.S3Interractor, kafkaSrv interfaces.KafkaService) *ImageService {
+func NewImageService(s3Repo S3Interractor, kafkaSrv KafkaService) *ImageService {
 	return &ImageService{
 		s3Repo:   s3Repo,
 		kafkaSrv: kafkaSrv,

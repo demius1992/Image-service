@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"github.com/demius1992/Image-service/imageUploader/internal/handlers"
-	"github.com/demius1992/Image-service/imageUploader/internal/interfaces"
 	"github.com/demius1992/Image-service/imageUploader/internal/repositories"
 	"github.com/demius1992/Image-service/imageUploader/internal/services"
 	"github.com/demius1992/Image-service/imageUploader/pkg/config"
@@ -17,9 +16,9 @@ import (
 
 type App struct {
 	httpServer   *http.Server
-	s3Repo       interfaces.S3Interractor
-	kafkaService interfaces.KafkaService
-	imageHandler interfaces.ImageHandler
+	s3Repo       services.S3Interractor
+	kafkaService services.KafkaService
+	imageHandler handlers.ImageHandler
 }
 
 func NewApp(cfg *config.Config) *App {

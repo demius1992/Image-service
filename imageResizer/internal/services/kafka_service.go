@@ -2,19 +2,21 @@ package services
 
 import (
 	"context"
-	"github.com/demius1992/Image-service/imageResizer/internal/interfaces"
 	"github.com/segmentio/kafka-go"
+	"github.com/sirupsen/logrus"
 	"log"
+	"net"
+	"strconv"
 )
 
 type kafkaRepo struct {
 	writer *kafka.Writer
 	reader *kafka.Reader
 	topic  string
-	s3Repo interfaces.S3RepositoryInterractor
+	s3Repo S3RepositoryInterractor
 }
 
-func NewKafkaService(brokers []string, topic string, s3Repo interfaces.S3RepositoryInterractor) interfaces.KafkaService {
+func NewKafkaService(brokers []string, topic string, s3Repo S3RepositoryInterractor) KafkaService {
 	w := &kafka.Writer{
 		Addr:                   kafka.TCP(brokers...),
 		Topic:                  topic,
@@ -24,7 +26,6 @@ func NewKafkaService(brokers []string, topic string, s3Repo interfaces.S3Reposit
 	r := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:  brokers,
 		Topic:    topic,
-		GroupID:  "my-group",
 		MinBytes: 10e3, // 10KB
 		MaxBytes: 10e6, // 10MB
 	})
@@ -47,7 +48,6 @@ func (r *kafkaRepo) GetMessages(ctx context.Context) (*kafka.Message, error) {
 
 	msg, err := r.reader.ReadMessage(ctx)
 	if err != nil {
-		log.Printf("Failed to read message from Kafka: %v", err)
 		return nil, err
 	}
 
@@ -68,6 +68,80 @@ func (r *kafkaRepo) SendMessage(ctx context.Context, ids, urls []string) error {
 			log.Printf("Failed to send message to Kafka: %v", err)
 			return err
 		}
+	}
+	return nil
+}
+
+func (r *kafkaRepo) listTopics() error {
+
+	for _, broker := range r.reader.Config().Brokers {
+		conn, err := kafka.Dial("tcp", broker)
+		if err != nil {
+			return err
+		}
+		defer conn.Close()
+
+		partitions, err := conn.ReadPartitions()
+		if err != nil {
+			return err
+		}
+
+		m := map[string]struct{}{}
+
+		for _, p := range partitions {
+			m[p.Topic] = struct{}{}
+		}
+		for k := range m {
+			logrus.Println(k)
+		}
+	}
+	return nil
+}
+
+func (r *kafkaRepo) CreateTopics() error {
+	brokers := r.reader.Config().Brokers
+	topic := r.topic
+
+	// Create topics in all Kafka nodes
+	for _, brokerAddr := range brokers {
+
+		// to create topics when auto.create.topics.enable='false'
+		conn, err := kafka.Dial("tcp", brokerAddr)
+		if err != nil {
+			panic(err.Error())
+		}
+		defer conn.Close()
+
+		controller, err := conn.Controller()
+		if err != nil {
+			panic(err.Error())
+		}
+		var controllerConn *kafka.Conn
+		controllerConn, err = kafka.Dial("tcp", net.JoinHostPort(controller.Host, strconv.Itoa(controller.Port)))
+		if err != nil {
+			panic(err.Error())
+		}
+		defer controllerConn.Close()
+
+		topicConfigs := []kafka.TopicConfig{
+			{
+				Topic:             topic,
+				NumPartitions:     3,
+				ReplicationFactor: 3,
+			},
+		}
+
+		err = controllerConn.CreateTopics(topicConfigs...)
+		if err != nil {
+			panic(err.Error())
+		}
+
+		log.Printf("Successfully created topic %s on broker %s", topic, brokerAddr)
+	}
+
+	err := r.listTopics()
+	if err != nil {
+		return err
 	}
 	return nil
 }
