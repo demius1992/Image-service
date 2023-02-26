@@ -127,7 +127,7 @@ func (r *kafkaRepo) CreateTopics() error {
 			{
 				Topic:             topic,
 				NumPartitions:     3,
-				ReplicationFactor: 3,
+				ReplicationFactor: 1,
 			},
 		}
 
