@@ -9,6 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"image"
 	"image/jpeg"
+	"io"
 )
 
 type KafkaService interface {
@@ -49,7 +50,7 @@ func (i *ImageService) ImageProcessor(ctx context.Context) error {
 	for {
 		msg, err := i.kafkaSrv.GetMessages(ctx)
 		if err != nil {
-			if err.Error() != "EOF" { // Check if error is not EOF
+			if err != io.EOF { // Check if error is not EOF
 				return err
 			}
 			//logrus.Println("Waiting for messages...")
@@ -111,6 +112,16 @@ func resizeImage(inputImage *models.Image) ([]*models.Image, error) {
 		imagesItem := &models.Image{
 			Content: buffer.Bytes(),
 		}
+
+		switch size.Width {
+		case 320:
+			imagesItem.Name = inputImage.Name + "-small"
+		case 640:
+			imagesItem.Name = inputImage.Name + "-medium"
+		case 1280:
+			imagesItem.Name = inputImage.Name + "-big"
+		}
+
 		images = append(images, imagesItem)
 	}
 

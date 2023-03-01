@@ -1,48 +1,53 @@
-version: '3'
+version: '3.9'
 
 networks:
   my_network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.16.0/24
 
 services:
 
   zookeeper-1:
-    image: confluentinc/cp-zookeeper:5.5.1
+    image: confluentinc/cp-zookeeper:7.0.1
     ports:
       - '32181:32181'
     environment:
-      ZOOKEEPER_CLIENT_PORT: 32181
-      ZOOKEEPER_TICK_TIME: 2000
+      - ZOOKEEPER_CLIENT_PORT=32181
+      - ZOOKEEPER_TICK_TIME=2000
+      - ZOOKEEPER_SERVER_ID=1
+      - ZOOKEEPER_SERVERS=zookeeper-1:2888:3888;zookeeper-2:2888:3888;zookeeper-3:2888:3888
     networks:
       - my_network
 
   zookeeper-2:
-    image: confluentinc/cp-zookeeper:5.5.1
+    image: confluentinc/cp-zookeeper:7.0.1
     ports:
       - '32182:32182'
     environment:
-      ZOOKEEPER_CLIENT_PORT: 32182
-      ZOOKEEPER_TICK_TIME: 2000
-      ZOOKEEPER_SERVER_ID: 2
-      ZOOKEEPER_SERVERS: "zookeeper-1:2888:3888;zookeeper-2:2888:3888;zookeeper-3:2888:3888"
+      - ZOOKEEPER_CLIENT_PORT=32182
+      - ZOOKEEPER_TICK_TIME=2000
+      - ZOOKEEPER_SERVER_ID=2
+      - ZOOKEEPER_SERVERS=zookeeper-1:2888:3888;zookeeper-2:2888:3888;zookeeper-3:2888:3888
     networks:
       - my_network
 
   zookeeper-3:
-    image: confluentinc/cp-zookeeper:5.5.1
+    image: confluentinc/cp-zookeeper:7.0.1
     ports:
       - '32183:32183'
     environment:
-      ZOOKEEPER_CLIENT_PORT: 32183
-      ZOOKEEPER_TICK_TIME: 2000
-      ZOOKEEPER_SERVER_ID: 3
-      ZOOKEEPER_SERVERS: "zookeeper-1:2888:3888;zookeeper-2:2888:3888;zookeeper-3:2888:3888"
+      - ZOOKEEPER_CLIENT_PORT=32183
+      - ZOOKEEPER_TICK_TIME=2000
+      - ZOOKEEPER_SERVER_ID=3
+      - ZOOKEEPER_SERVERS=zookeeper-1:2888:3888;zookeeper-2:2888:3888;zookeeper-3:2888:3888
     networks:
       - my_network
 
 
   kafka-1:
-    image: confluentinc/cp-kafka:5.5.1
+    image: confluentinc/cp-kafka:7.0.1
     ports:
       - '9092:9092'
     depends_on:
@@ -50,18 +55,18 @@ services:
       - zookeeper-2
       - zookeeper-3
     environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper-1:32181,zookeeper-2:32182,zookeeper-3:32183
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-1:29092,EXTERNAL://localhost:9092
-      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
-      KAFKA_NUM_PARTITIONS: 3
+      - KAFKA_BROKER_ID=1
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper-1:32181,zookeeper-2:32182,zookeeper-3:32183
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL
+      - KAFKA_ADVERTISED_LISTENERS=INTERNAL://kafka-1:29092,EXTERNAL://localhost:9092
+      - KAFKA_DEFAULT_REPLICATION_FACTOR=3
+      - KAFKA_NUM_PARTITIONS=3
     networks:
       - my_network
 
   kafka-2:
-    image: confluentinc/cp-kafka:5.5.1
+    image: confluentinc/cp-kafka:7.0.1
     ports:
       - '9093:9093'
     depends_on:
@@ -69,18 +74,18 @@ services:
       - zookeeper-2
       - zookeeper-3
     environment:
-      KAFKA_BROKER_ID: 2
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper-1:32181,zookeeper-2:32182,zookeeper-3:32183
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-2:29093,EXTERNAL://localhost:9093
-      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
-      KAFKA_NUM_PARTITIONS: 3
+      - KAFKA_BROKER_ID=2
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper-1:32181,zookeeper-2:32182,zookeeper-3:32183
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL
+      - KAFKA_ADVERTISED_LISTENERS=INTERNAL://kafka-2:29093,EXTERNAL://localhost:9093
+      - KAFKA_DEFAULT_REPLICATION_FACTOR=3
+      - KAFKA_NUM_PARTITIONS=3
     networks:
       - my_network
 
   kafka-3:
-    image: confluentinc/cp-kafka:5.5.1
+    image: confluentinc/cp-kafka:7.0.1
     ports:
       - '9094:9094'
     depends_on:
@@ -88,13 +93,13 @@ services:
       - zookeeper-2
       - zookeeper-3
     environment:
-      KAFKA_BROKER_ID: 3
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper-1:32181,zookeeper-2:32182,zookeeper-3:32183
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-3:29094,EXTERNAL://localhost:9094
-      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
-      KAFKA_NUM_PARTITIONS: 3
+      - KAFKA_BROKER_ID=3
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper-1:32181,zookeeper-2:32182,zookeeper-3:32183
+      - KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_INTER_BROKER_LISTENER_NAME=INTERNAL
+      - KAFKA_ADVERTISED_LISTENERS=INTERNAL://kafka-3:29094,EXTERNAL://localhost:9094
+      - KAFKA_DEFAULT_REPLICATION_FACTOR=3
+      - KAFKA_NUM_PARTITIONS=3
     networks:
       - my_network
 
@@ -102,33 +107,41 @@ services:
     build:
       context: ./imageUploader
     environment:
-      S3_REGION: "aws_region"
-      S3_BUCKET: "us-east-1"
-      KAFKA_TOPIC: "image-topic"
-      KAFKA_BROKERS: "kafka-1:29092,kafka-2:29093,kafka-3:29094"
+      - ACCESS_KEY=qwe
+      - SECRET_KEY=qwe
+      - ENDPOINT=http://localstack:4566
+      - S3_BUCKET=us-east-1
+      - KAFKA_TOPIC=image-topic
+      - KAFKA_BROKERS=kafka-1:29092,kafka-2:29093,kafka-3:29094
     depends_on:
       - kafka-1
       - kafka-2
       - kafka-3
+      - localstack
     expose:
       - "8080"
     networks:
       - my_network
+    restart: on-failure
 
   image-resizer:
     build:
       context: ./imageResizer
     environment:
-      S3_REGION: "aws_region"
-      S3_BUCKET: "us-east-1"
-      KAFKA_TOPIC: "image-topic"
-      KAFKA_BROKERS: "kafka-1:29092,kafka-2:29093,kafka-3:29094"
+      - ACCESS_KEY=qwe
+      - SECRET_KEY=qwe
+      - ENDPOINT=http://localstack:4566
+      - S3_BUCKET=us-east-1
+      - KAFKA_TOPIC=image-topic
+      - KAFKA_BROKERS=kafka-1:29092,kafka-2:29093,kafka-3:29094
     depends_on:
       - kafka-1
       - kafka-2
       - kafka-3
+      - localstack
     networks:
       - my_network
+    restart: on-failure
 
   nginx:
     build: "./nginx"
@@ -139,3 +152,39 @@ services:
       - image-uploader
     networks:
       - my_network
+
+  localstack:
+    image: localstack/localstack:latest
+    hostname: localstack
+    environment:
+      - SERVICES=s3
+      - DEBUG=1
+      - DATA_DIR=/tmp/localstack/data
+      - PORT_WEB_UI=8081
+      - LAMBDA_EXECUTOR=docker-reuse
+      - LAMBDA_REMOTE_DOCKER=false
+      - LAMBDA_REMOVE_CONTAINERS=true
+      - KINESIS_ERROR_PROBABILITY=${KINESIS_ERROR_PROBABILITY- }
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - HOST_TMP_FOLDER=${TMPDIR}
+      - LEGACY_DIRECTORIES=1
+      - AWS_REGION=eu-west-1
+      - AWS_ACCESS_KEY_ID=qwe
+      - AWS_SECRET_ACCESS_KEY=qwe
+    ports:
+      - "4566-4599:4566-4599"
+      - "${PORT_WEB_UI-8081}:${PORT_WEB_UI-8080}"
+    #      - "4566:4566"
+    #      - "8081:8080"
+    volumes:
+      - ./data:/tmp/localstack
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - ./bin:/docker-entrypoint-initaws.d
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -sS http://localhost:8080/health | grep '^Ready'" ]
+      interval: 5s
+      retries: 10
+    container_name: "${LOCALSTACK_DOCKER_NAME-localstack}"
+    networks:
+      - my_network
+    restart: on-failure

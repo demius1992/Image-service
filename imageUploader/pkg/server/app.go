@@ -2,12 +2,15 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"github.com/demius1992/Image-service/imageUploader/internal/handlers"
 	"github.com/demius1992/Image-service/imageUploader/internal/repositories"
 	"github.com/demius1992/Image-service/imageUploader/internal/services"
 	"github.com/demius1992/Image-service/imageUploader/pkg/config"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
+	"io"
 	"net/http"
 	"os"
 	"os/signal"
@@ -15,59 +18,82 @@ import (
 )
 
 type App struct {
-	httpServer   *http.Server
-	s3Repo       services.S3Interractor
-	kafkaService services.KafkaService
-	imageHandler handlers.ImageHandler
+	httpServer    *http.Server
+	s3Repo        services.S3Interractor
+	kafkaService  services.KafkaService
+	imageServicer handlers.ImageServicer
 }
 
-func NewApp(cfg *config.Config) *App {
+func NewApp(cfg *config.Config) (*App, error) {
 
 	// Initialize the S3 repositories
-	s3Repo := repositories.NewS3Repository(cfg.AwsRegion, cfg.AwsBucket)
+	s3Repo, err := repositories.NewS3Repository(cfg.AwsRegion, cfg.AwsBucket)
+	if err != nil {
+		return nil, fmt.Errorf("%s", err.Error())
+	}
 
 	// Initialize the services
 	kafkaService := services.NewKafkaService(cfg.KafkaBrokers, cfg.KafkaTopic)
 	imageService := services.NewImageService(s3Repo, kafkaService)
 
 	return &App{
-		s3Repo:       s3Repo,
-		kafkaService: kafkaService,
-		imageHandler: imageService,
-	}
+		s3Repo:        s3Repo,
+		kafkaService:  kafkaService,
+		imageServicer: imageService,
+	}, nil
 }
 
 func (a *App) Run(port string) error {
 	// Initialize the handler
-	imageHandler := handlers.NewImageHandler(a.imageHandler)
+	imageHandler := handlers.NewImageHandler(a.imageServicer)
 
 	// Initialize the Gin router
 	router := gin.Default()
 
 	router.Use(
 		gin.Recovery(),
-		gin.Logger(),
+		//gin.Logger(),
 	)
+
+	// Reads messages from kafka constantly
+	go func() {
+		for {
+			message, err := a.kafkaService.GetMessages()
+			if err != io.EOF {
+				logrus.Errorf("error occured while reading messages from kafka: %+v", err)
+				return
+			}
+			logrus.Printf("kafka message output: %s", message)
+		}
+	}()
 
 	// Register the HTTP endpoints
 	router.GET("/health", func(c *gin.Context) {
 		c.String(http.StatusOK, "OK")
 	})
 
-	// Reads messages from kafka constantly
-	go func() {
+	router.GET("/kafka-check", func(c *gin.Context) {
+		err := a.kafkaService.SendMessage(context.Background(), uuid.New())
+		if err != nil {
+			logrus.Printf("error uccurred while sending a message to kafka: %v", err)
+			c.String(http.StatusInternalServerError, err.Error())
+			return
+		}
+
 		messages, err := a.kafkaService.GetMessages()
 		if err != nil {
-			logrus.Printf("error whil=e reading messages from kafka: %+v", err)
+			if err != nil {
+				logrus.Printf("error uccurred while reading message from kafka: %v", err)
+				c.String(http.StatusInternalServerError, err.Error())
+				return
+			}
+			c.String(http.StatusOK, "OK", messages)
 		}
-		for _, message := range messages {
-			logrus.Printf("kafka message output: %s", message)
-		}
-	}()
+	})
 
 	router.POST("/images", imageHandler.UploadImage)
-	router.GET("/images/:id", imageHandler.GetImage)
-	router.GET("/images/variants", imageHandler.GetImageVariants)
+	router.GET("/images/:name", imageHandler.GetImage)
+	router.POST("/images/variants", imageHandler.GetImageVariants)
 
 	// HTTP Server
 	a.httpServer = &http.Server{

@@ -3,19 +3,18 @@ package handlers
 import (
 	"bytes"
 	"github.com/demius1992/Image-service/imageUploader/internal/models"
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"io"
 	"net/http"
-
-	"github.com/gin-gonic/gin"
 )
 
 const MAX_UPLOAD_SIZE = 5 << 30
 
-// ImageHandler provides an interface for interacting with ImageService
-type ImageHandler interface {
-	UploadImage(image io.Reader, contentType string) (*models.Image, error)
+// ImageServicer provides an interface for interacting with ImageService
+type ImageServicer interface {
+	UploadImage(image io.ReadSeeker, contentType string) (*models.Image, error)
 	GetImage(id uuid.UUID) (*models.Image, error)
 	GetImageVariants(ids []string) ([]*models.Image, error)
 }
@@ -28,13 +27,13 @@ type IDs struct {
 
 // ImageHandle handles the image-related endpoints.
 type ImageHandle struct {
-	imageService ImageHandler
+	imageService ImageServicer
 }
 
 // NewImageHandler creates a new ImageHandle instance.
-func NewImageHandler(imageHandler ImageHandler) *ImageHandle {
+func NewImageHandler(imageServicer ImageServicer) *ImageHandle {
 	return &ImageHandle{
-		imageService: imageHandler,
+		imageService: imageServicer,
 	}
 }
 
@@ -45,21 +44,22 @@ func (h *ImageHandle) UploadImage(c *gin.Context) {
 	// Get the image file from the request
 	file, header, err := c.Request.FormFile("image")
 	if err != nil {
-		logrus.Println(err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to get the image file from the request"})
+		logrus.Errorf("error ocured while getting image from the request: %v", err)
+		c.JSON(http.StatusBadRequest, err.Error())
 		return
 	}
 	defer file.Close()
 
 	buffer := make([]byte, header.Size)
 	_, _ = file.Read(buffer)
+	fileBytes := bytes.NewReader(buffer)
 	contentType := http.DetectContentType(buffer)
 
 	// Upload the image to S3 and publish a message to Kafka
-	image, err := h.imageService.UploadImage(file, contentType)
+	image, err := h.imageService.UploadImage(fileBytes, contentType)
 	if err != nil {
-		logrus.Println(err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload the image"})
+		logrus.Errorf("error ocured while uploading image: %v", err)
+		c.JSON(http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -84,7 +84,6 @@ func (h *ImageHandle) GetImage(c *gin.Context) {
 	// Retrieve the image from S3
 	image, err := h.imageService.GetImage(fromBytes)
 	if err != nil {
-		logrus.Println(err)
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retrieve the image"})
 		return
 	}
@@ -99,7 +98,7 @@ func (h *ImageHandle) GetImageVariants(c *gin.Context) {
 	var data IDs
 
 	if err := c.BindJSON(&data); err != nil {
-		logrus.Println(err)
+		logrus.Errorf("error occured while getting names from the request body: %v", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to parse image URLs from the request body"})
 		return
 	}
@@ -109,7 +108,6 @@ func (h *ImageHandle) GetImageVariants(c *gin.Context) {
 	// Retrieve the image variants from S3
 	imageVariants, err := h.imageService.GetImageVariants(ids)
 	if err != nil {
-		logrus.Println(err)
 		c.JSON(http.StatusNotFound, gin.H{"error": "Failed to retrieve the image variants"})
 		return
 	}

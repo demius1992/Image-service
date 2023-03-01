@@ -5,10 +5,9 @@ import (
 	"context"
 	"fmt"
 	"github.com/demius1992/Image-service/imageUploader/internal/models"
+	"github.com/google/uuid"
 	"io"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 // KafkaService provides an interface for interacting with Kafka.
@@ -19,7 +18,7 @@ type KafkaService interface {
 
 // S3Interractor provides an interface for interacting with s3Repository
 type S3Interractor interface {
-	UploadImage(id uuid.UUID, contentType string, data io.Reader) (string, error)
+	UploadImage(id uuid.UUID, contentType string, contentLength int64, data io.ReadSeeker) (string, error)
 	GetImage(id uuid.UUID, variantName string) (*models.Image, error)
 	GetImageVariants(ids []string) ([]*models.Image, error)
 }
@@ -39,7 +38,7 @@ func NewImageService(s3Repo S3Interractor, kafkaSrv KafkaService) *ImageService 
 }
 
 // UploadImage uploads an image to S3 and publishes a message to Kafka.
-func (s *ImageService) UploadImage(image io.Reader, contentType string) (*models.Image, error) {
+func (s *ImageService) UploadImage(image io.ReadSeeker, contentType string) (*models.Image, error) {
 	// Generate a unique ID for the image
 	id := uuid.New()
 
@@ -50,8 +49,10 @@ func (s *ImageService) UploadImage(image io.Reader, contentType string) (*models
 		return nil, fmt.Errorf("failed to read the image data: %v", err)
 	}
 
+	size := int64(imageData.Len())
+
 	// Upload the original image to S3
-	originalImageURL, err := s.s3Repo.UploadImage(id, contentType, imageData)
+	originalImageURL, err := s.s3Repo.UploadImage(id, contentType, size, image)
 	if err != nil {
 		return nil, fmt.Errorf("failed to upload the original image to S3: %v", err)
 	}
@@ -69,7 +70,7 @@ func (s *ImageService) UploadImage(image io.Reader, contentType string) (*models
 		Name:        "original",
 		URL:         originalImageURL,
 		ContentType: contentType,
-		Size:        int64(imageData.Len()),
+		Size:        size,
 		Content:     imageData.Bytes(),
 	}
 	return imageModel, nil

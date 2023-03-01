@@ -55,7 +55,7 @@ func (r *kafkaRepo) GetMessages() ([]string, error) {
 			if err == context.DeadlineExceeded {
 				break
 			}
-			return []string{""}, err
+			return nil, err
 		}
 
 		//Gets ids from message keys
@@ -68,7 +68,7 @@ func (r *kafkaRepo) GetMessages() ([]string, error) {
 // SendMessage sends a message to Kafka.
 func (r *kafkaRepo) SendMessage(ctx context.Context, id uuid.UUID) error {
 	messageKey := []byte(id.String())
-	messageValue := []byte("")
+	messageValue := []byte("empty value")
 
 	err := r.writer.WriteMessages(ctx, kafka.Message{
 		Key:   messageKey,

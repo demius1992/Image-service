@@ -4,12 +4,15 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/demius1992/Image-service/imageResizer/internal/models"
 	"github.com/google/uuid"
 	"github.com/segmentio/kafka-go"
+	"github.com/sirupsen/logrus"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -19,18 +22,26 @@ type S3Repository struct {
 }
 
 // NewS3Repository creates a new instance of the repository
-func NewS3Repository(bucket string, region string) (*S3Repository, error) {
+func NewS3Repository(bucketName string, region string) (*S3Repository, error) {
+	// Initialize a session that connects to LocalStack S3.
 	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String(region)},
+		Region:           aws.String(region),
+		Endpoint:         aws.String(os.Getenv("ENDPOINT")),
+		Credentials:      credentials.NewStaticCredentials(os.Getenv("ACCESS_KEY"), os.Getenv("SECRET_KEY"), ""),
+		S3ForcePathStyle: aws.Bool(true),
+		DisableSSL:       aws.Bool(true),
+	},
 	)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to create S3 session: %v", err)
 	}
 
+	// Create an S3 client object
+	svc := s3.New(sess)
+
 	return &S3Repository{
-		bucket: bucket,
-		svc:    s3.New(sess),
+		bucket: bucketName,
+		svc:    svc,
 	}, nil
 }
 
@@ -50,6 +61,7 @@ func (r *S3Repository) GetImage(message *kafka.Message) (*models.Image, error) {
 	buf := new(bytes.Buffer)
 	_, err = buf.ReadFrom(result.Body)
 	if err != nil {
+		logrus.Errorf("error occured while reading image data: %s", err.Error())
 		return nil, err
 	}
 
