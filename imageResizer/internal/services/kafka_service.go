@@ -13,10 +13,10 @@ type kafkaRepo struct {
 	writer *kafka.Writer
 	reader *kafka.Reader
 	topic  string
-	s3Repo S3RepositoryInterractor
+	s3Repo S3ImageRepository
 }
 
-func NewKafkaService(brokers []string, topic string, s3Repo S3RepositoryInterractor) KafkaService {
+func NewKafkaService(brokers []string, topic string, s3Repo S3ImageRepository) KafkaService {
 	w := &kafka.Writer{
 		Addr:                   kafka.TCP(brokers...),
 		Topic:                  topic,

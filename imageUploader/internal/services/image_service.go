@@ -7,6 +7,7 @@ import (
 	"github.com/demius1992/Image-service/imageUploader/internal/models"
 	"github.com/google/uuid"
 	"io"
+	"net/http"
 	"time"
 )
 
@@ -16,21 +17,21 @@ type KafkaService interface {
 	GetMessages() ([]string, error)
 }
 
-// S3Interractor provides an interface for interacting with s3Repository
-type S3Interractor interface {
-	UploadImage(id uuid.UUID, contentType string, contentLength int64, data io.ReadSeeker) (string, error)
+// S3ImageRepository provides an interface for interacting with s3Repository
+type S3ImageRepository interface {
+	UploadImage(id uuid.UUID, data io.ReadSeeker) (string, error)
 	GetImage(id uuid.UUID, variantName string) (*models.Image, error)
 	GetImageVariants(ids []string) ([]*models.Image, error)
 }
 
 // ImageService handles the image-related operations.
 type ImageService struct {
-	s3Repo   S3Interractor
+	s3Repo   S3ImageRepository
 	kafkaSrv KafkaService
 }
 
 // NewImageService creates a new ImageService instance.
-func NewImageService(s3Repo S3Interractor, kafkaSrv KafkaService) *ImageService {
+func NewImageService(s3Repo S3ImageRepository, kafkaSrv KafkaService) *ImageService {
 	return &ImageService{
 		s3Repo:   s3Repo,
 		kafkaSrv: kafkaSrv,
@@ -38,7 +39,7 @@ func NewImageService(s3Repo S3Interractor, kafkaSrv KafkaService) *ImageService 
 }
 
 // UploadImage uploads an image to S3 and publishes a message to Kafka.
-func (s *ImageService) UploadImage(image io.ReadSeeker, contentType string) (*models.Image, error) {
+func (s *ImageService) UploadImage(image io.ReadSeeker) (*models.Image, error) {
 	// Generate a unique ID for the image
 	id := uuid.New()
 
@@ -52,7 +53,7 @@ func (s *ImageService) UploadImage(image io.ReadSeeker, contentType string) (*mo
 	size := int64(imageData.Len())
 
 	// Upload the original image to S3
-	originalImageURL, err := s.s3Repo.UploadImage(id, contentType, size, image)
+	originalImageURL, err := s.s3Repo.UploadImage(id, image)
 	if err != nil {
 		return nil, fmt.Errorf("failed to upload the original image to S3: %v", err)
 	}
@@ -69,7 +70,7 @@ func (s *ImageService) UploadImage(image io.ReadSeeker, contentType string) (*mo
 		CreatedAt:   time.Now().UTC().Format(time.RFC3339),
 		Name:        "original",
 		URL:         originalImageURL,
-		ContentType: contentType,
+		ContentType: http.DetectContentType(imageData.Bytes()),
 		Size:        size,
 		Content:     imageData.Bytes(),
 	}

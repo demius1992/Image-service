@@ -3,9 +3,6 @@ version: '3.9'
 networks:
   my_network:
     driver: bridge
-    ipam:
-      config:
-        - subnet: 192.168.16.0/24
 
 services:
 
@@ -107,10 +104,11 @@ services:
     build:
       context: ./imageUploader
     environment:
-      - ACCESS_KEY=qwe
-      - SECRET_KEY=qwe
+      - ACCESS_KEY=test
+      - SECRET_KEY=test
       - ENDPOINT=http://localstack:4566
-      - S3_BUCKET=us-east-1
+      - S3_BUCKET=my-bucket
+      - S3_REGION=us-east-1
       - KAFKA_TOPIC=image-topic
       - KAFKA_BROKERS=kafka-1:29092,kafka-2:29093,kafka-3:29094
     depends_on:
@@ -128,10 +126,11 @@ services:
     build:
       context: ./imageResizer
     environment:
-      - ACCESS_KEY=qwe
-      - SECRET_KEY=qwe
+      - ACCESS_KEY=test
+      - SECRET_KEY=test
       - ENDPOINT=http://localstack:4566
-      - S3_BUCKET=us-east-1
+      - S3_BUCKET=my-bucket
+      - S3_REGION=us-east-1
       - KAFKA_TOPIC=image-topic
       - KAFKA_BROKERS=kafka-1:29092,kafka-2:29093,kafka-3:29094
     depends_on:
@@ -154,37 +153,26 @@ services:
       - my_network
 
   localstack:
+    container_name: "localstack"
     image: localstack/localstack:latest
     hostname: localstack
     environment:
-      - SERVICES=s3
-      - DEBUG=1
-      - DATA_DIR=/tmp/localstack/data
-      - PORT_WEB_UI=8081
-      - LAMBDA_EXECUTOR=docker-reuse
-      - LAMBDA_REMOTE_DOCKER=false
-      - LAMBDA_REMOVE_CONTAINERS=true
-      - KINESIS_ERROR_PROBABILITY=${KINESIS_ERROR_PROBABILITY- }
-      - DOCKER_HOST=unix:///var/run/docker.sock
-      - HOST_TMP_FOLDER=${TMPDIR}
-      - LEGACY_DIRECTORIES=1
-      - AWS_REGION=eu-west-1
-      - AWS_ACCESS_KEY_ID=qwe
-      - AWS_SECRET_ACCESS_KEY=qwe
+      - SERVICES=s3 #AWS Services that you want in your localstack
+      - DEBUG=1 # Debug level 1 if you want to logs, 0 if you want to disable
+      - START_WEB=0 # Flag to control whether the Web UI should be started in Docker
+      - LAMBDA_REMOTE_DOCKER=0
+      - DATA_DIR=/tmp/localstack/data #  Local directory for saving persistent data(Example: es storage)
+      - DEFAULT_REGION=us-east-1
     ports:
-      - "4566-4599:4566-4599"
-      - "${PORT_WEB_UI-8081}:${PORT_WEB_UI-8080}"
-    #      - "4566:4566"
-    #      - "8081:8080"
+      - "4566:4566"
+      - "8081:8080"
     volumes:
-      - ./data:/tmp/localstack
-      - "/var/run/docker.sock:/var/run/docker.sock"
-      - ./bin:/docker-entrypoint-initaws.d
+      - './.localstack:/var/lib/localstack'
+      - '/var/run/docker.sock:/var/run/docker.sock'
     healthcheck:
       test: [ "CMD-SHELL", "curl -sS http://localhost:8080/health | grep '^Ready'" ]
       interval: 5s
       retries: 10
-    container_name: "${LOCALSTACK_DOCKER_NAME-localstack}"
     networks:
       - my_network
     restart: on-failure

@@ -18,7 +18,7 @@ type KafkaService interface {
 	CreateTopics() error
 }
 
-type S3RepositoryInterractor interface {
+type S3ImageRepository interface {
 	GetImage(message *kafka.Message) (*models.Image, error)
 	UploadImages(inputImages []*models.Image) ([]string, []string, error)
 }
@@ -30,10 +30,10 @@ type imageSize struct {
 
 type ImageService struct {
 	kafkaSrv KafkaService
-	s3Repo   S3RepositoryInterractor
+	s3Repo   S3ImageRepository
 }
 
-func NewImageService(kafkaSrv KafkaService, s3Repo S3RepositoryInterractor) *ImageService {
+func NewImageService(kafkaSrv KafkaService, s3Repo S3ImageRepository) *ImageService {
 	return &ImageService{
 		kafkaSrv: kafkaSrv,
 		s3Repo:   s3Repo,

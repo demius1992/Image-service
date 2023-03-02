@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -25,11 +26,11 @@ type S3Repository struct {
 func NewS3Repository(region, bucketName string) (*S3Repository, error) {
 	// Initialize a session that connects to LocalStack S3.
 	sess, err := session.NewSession(&aws.Config{
-		Region:           aws.String(region),
-		Endpoint:         aws.String(os.Getenv("ENDPOINT")),
+		Region:   aws.String(region),
+		Endpoint: aws.String(os.Getenv("ENDPOINT")),
+		//Credentials: credentials.NewStaticCredentials("test", "test", ""),
 		Credentials:      credentials.NewStaticCredentials(os.Getenv("ACCESS_KEY"), os.Getenv("SECRET_KEY"), ""),
 		S3ForcePathStyle: aws.Bool(true),
-		DisableSSL:       aws.Bool(true),
 	},
 	)
 	if err != nil {
@@ -46,15 +47,26 @@ func NewS3Repository(region, bucketName string) (*S3Repository, error) {
 }
 
 // UploadImage uploads a file to S3.
-func (r *S3Repository) UploadImage(id uuid.UUID, contentType string, contentLength int64, data io.ReadSeeker) (string, error) {
-	// Upload the file to S3
-	_, err := r.svc.PutObject(&s3.PutObjectInput{
-		Bucket:        aws.String(r.bucket),
-		Key:           aws.String(id.String()),
-		Body:          data,
-		ContentType:   aws.String(contentType),
-		ContentLength: aws.Int64(contentLength),
+func (r *S3Repository) UploadImage(id uuid.UUID, data io.ReadSeeker) (string, error) {
+	// Create the S3 bucket if it does not exist
+	_, err := r.svc.CreateBucket(&s3.CreateBucketInput{
+		Bucket: aws.String(r.bucket),
 	})
+	if err != nil {
+		// If the bucket already exists, ignore the error
+		if aerr, ok := err.(awserr.Error); !ok || aerr.Code() != s3.ErrCodeBucketAlreadyExists {
+			logrus.Errorf("error occured while creating a bucket: %s", err.Error())
+			return "", err
+		}
+	}
+
+	// Upload the file to S3
+	_, err = r.svc.PutObject(&s3.PutObjectInput{
+		Bucket: aws.String(r.bucket),
+		Key:    aws.String(id.String()),
+		Body:   data,
+	})
+
 	if err != nil {
 		logrus.Errorf("error occured while uploading file to bucket: %s", err.Error())
 		return "", err

@@ -10,11 +10,9 @@ import (
 	"net/http"
 )
 
-const MAX_UPLOAD_SIZE = 5 << 30
-
 // ImageServicer provides an interface for interacting with ImageService
 type ImageServicer interface {
-	UploadImage(image io.ReadSeeker, contentType string) (*models.Image, error)
+	UploadImage(image io.ReadSeeker) (*models.Image, error)
 	GetImage(id uuid.UUID) (*models.Image, error)
 	GetImageVariants(ids []string) ([]*models.Image, error)
 }
@@ -39,24 +37,32 @@ func NewImageHandler(imageServicer ImageServicer) *ImageHandle {
 
 // UploadImage handles the image upload endpoint.
 func (h *ImageHandle) UploadImage(c *gin.Context) {
-	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, MAX_UPLOAD_SIZE)
-
-	// Get the image file from the request
-	file, header, err := c.Request.FormFile("image")
+	formFile, err := c.FormFile("image")
 	if err != nil {
 		logrus.Errorf("error ocured while getting image from the request: %v", err)
 		c.JSON(http.StatusBadRequest, err.Error())
 		return
 	}
-	defer file.Close()
 
-	buffer := make([]byte, header.Size)
-	_, _ = file.Read(buffer)
-	fileBytes := bytes.NewReader(buffer)
-	contentType := http.DetectContentType(buffer)
+	src, err := formFile.Open()
+	if err != nil {
+		logrus.Errorf("error ocured while opening file from the request: %v", err)
+		c.JSON(http.StatusBadRequest, err.Error())
+		return
+	}
+
+	defer src.Close()
+	body, err := io.ReadAll(src)
+	if err != nil {
+		logrus.Errorf("error ocured while io.ReadAll: %v", err)
+		c.JSON(http.StatusBadRequest, err.Error())
+		return
+	}
+
+	reader := bytes.NewReader(body)
 
 	// Upload the image to S3 and publish a message to Kafka
-	image, err := h.imageService.UploadImage(fileBytes, contentType)
+	image, err := h.imageService.UploadImage(reader)
 	if err != nil {
 		logrus.Errorf("error ocured while uploading image: %v", err)
 		c.JSON(http.StatusInternalServerError, err.Error())

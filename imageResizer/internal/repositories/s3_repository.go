@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/segmentio/kafka-go"
 	"github.com/sirupsen/logrus"
-	"net/http"
 	"os"
 	"time"
 )
@@ -29,7 +28,6 @@ func NewS3Repository(bucketName string, region string) (*S3Repository, error) {
 		Endpoint:         aws.String(os.Getenv("ENDPOINT")),
 		Credentials:      credentials.NewStaticCredentials(os.Getenv("ACCESS_KEY"), os.Getenv("SECRET_KEY"), ""),
 		S3ForcePathStyle: aws.Bool(true),
-		DisableSSL:       aws.Bool(true),
 	},
 	)
 	if err != nil {
@@ -47,7 +45,10 @@ func NewS3Repository(bucketName string, region string) (*S3Repository, error) {
 
 // GetImage downloads an image from S3 using the provided image ID
 func (r *S3Repository) GetImage(message *kafka.Message) (*models.Image, error) {
-	imageID := message.Value
+	imageID := message.Key
+
+	logrus.Println("message from kafka", string(imageID))
+
 	result, err := r.svc.GetObject(&s3.GetObjectInput{
 		Bucket: aws.String(r.bucket),
 		Key:    aws.String(string(imageID)),
@@ -83,22 +84,20 @@ func (r *S3Repository) UploadImages(inputImages []*models.Image) ([]string, []st
 
 	for _, image := range inputImages {
 		id := uuid.New()
-		contentType := http.DetectContentType(image.Content)
 
 		// Upload the file to S3
 		_, err := r.svc.PutObject(&s3.PutObjectInput{
-			Bucket:      aws.String(r.bucket),
-			Key:         aws.String(id.String()),
-			Body:        bytes.NewReader(image.Content),
-			ContentType: aws.String(contentType),
+			Bucket: aws.String(r.bucket),
+			Key:    aws.String(id.String()),
+			Body:   bytes.NewReader(image.Content),
 		})
 		if err != nil {
-			return []string{""}, []string{""}, fmt.Errorf("failed to upload image: %v", err)
+			return nil, nil, fmt.Errorf("failed to upload image: %v", err)
 		}
 
 		url, err := r.getSignedURL(id.String(), time.Hour)
 		if err != nil {
-			return []string{""}, []string{""}, err
+			return nil, nil, err
 		}
 
 		ids = append(ids, id.String())
