@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/demius1992/Image-service/imageResizer/internal/models"
 	"github.com/google/uuid"
 	"github.com/segmentio/kafka-go"
-	"net/http"
+	"github.com/sirupsen/logrus"
+	"os"
 	"time"
 )
 
@@ -19,24 +21,34 @@ type S3Repository struct {
 }
 
 // NewS3Repository creates a new instance of the repository
-func NewS3Repository(bucket string, region string) (*S3Repository, error) {
+func NewS3Repository(bucketName string, region string) (*S3Repository, error) {
+	// Initialize a session that connects to LocalStack S3.
 	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String(region)},
+		Region:           aws.String(region),
+		Endpoint:         aws.String(os.Getenv("ENDPOINT")),
+		Credentials:      credentials.NewStaticCredentials(os.Getenv("ACCESS_KEY"), os.Getenv("SECRET_KEY"), ""),
+		S3ForcePathStyle: aws.Bool(true),
+	},
 	)
-
 	if err != nil {
 		return nil, fmt.Errorf("failed to create S3 session: %v", err)
 	}
 
+	// Create an S3 client object
+	svc := s3.New(sess)
+
 	return &S3Repository{
-		bucket: bucket,
-		svc:    s3.New(sess),
+		bucket: bucketName,
+		svc:    svc,
 	}, nil
 }
 
 // GetImage downloads an image from S3 using the provided image ID
 func (r *S3Repository) GetImage(message *kafka.Message) (*models.Image, error) {
-	imageID := message.Value
+	imageID := message.Key
+
+	logrus.Println("message from kafka", string(imageID))
+
 	result, err := r.svc.GetObject(&s3.GetObjectInput{
 		Bucket: aws.String(r.bucket),
 		Key:    aws.String(string(imageID)),
@@ -50,6 +62,7 @@ func (r *S3Repository) GetImage(message *kafka.Message) (*models.Image, error) {
 	buf := new(bytes.Buffer)
 	_, err = buf.ReadFrom(result.Body)
 	if err != nil {
+		logrus.Errorf("error occured while reading image data: %s", err.Error())
 		return nil, err
 	}
 
@@ -71,22 +84,20 @@ func (r *S3Repository) UploadImages(inputImages []*models.Image) ([]string, []st
 
 	for _, image := range inputImages {
 		id := uuid.New()
-		contentType := http.DetectContentType(image.Content)
 
 		// Upload the file to S3
 		_, err := r.svc.PutObject(&s3.PutObjectInput{
-			Bucket:      aws.String(r.bucket),
-			Key:         aws.String(id.String()),
-			Body:        bytes.NewReader(image.Content),
-			ContentType: aws.String(contentType),
+			Bucket: aws.String(r.bucket),
+			Key:    aws.String(id.String()),
+			Body:   bytes.NewReader(image.Content),
 		})
 		if err != nil {
-			return []string{""}, []string{""}, fmt.Errorf("failed to upload image: %v", err)
+			return nil, nil, fmt.Errorf("failed to upload image: %v", err)
 		}
 
 		url, err := r.getSignedURL(id.String(), time.Hour)
 		if err != nil {
-			return []string{""}, []string{""}, err
+			return nil, nil, err
 		}
 
 		ids = append(ids, id.String())

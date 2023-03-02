@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"github.com/demius1992/Image-service/imageUploader/internal/interfaces"
 	"github.com/google/uuid"
 	"github.com/segmentio/kafka-go"
 	"github.com/sirupsen/logrus"
@@ -15,7 +14,7 @@ type kafkaRepo struct {
 	topic  string
 }
 
-func NewKafkaService(brokers []string, topic string) interfaces.KafkaService {
+func NewKafkaService(brokers []string, topic string) KafkaService {
 	w := &kafka.Writer{
 		Addr:                   kafka.TCP(brokers...),
 		Topic:                  topic,
@@ -56,7 +55,7 @@ func (r *kafkaRepo) GetMessages() ([]string, error) {
 			if err == context.DeadlineExceeded {
 				break
 			}
-			return []string{""}, err
+			return nil, err
 		}
 
 		//Gets ids from message keys
@@ -69,7 +68,7 @@ func (r *kafkaRepo) GetMessages() ([]string, error) {
 // SendMessage sends a message to Kafka.
 func (r *kafkaRepo) SendMessage(ctx context.Context, id uuid.UUID) error {
 	messageKey := []byte(id.String())
-	messageValue := []byte("")
+	messageValue := []byte("empty value")
 
 	err := r.writer.WriteMessages(ctx, kafka.Message{
 		Key:   messageKey,

@@ -8,4 +8,7 @@ type Config struct {
 	AwsBucket    string   `mapstructure:"aws_bucket"`
 	KafkaBrokers []string `mapstructure:"kafka_brokers"`
 	KafkaTopic   string   `mapstructure:"kafka_topic"`
+	AccessKey    string   `mapstructure:"access_key"`
+	SecretKey    string   `mapstructure:"secret_key"`
+	Endpoint     string   `mapstructure:"endpoint"`
 }

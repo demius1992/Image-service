@@ -4,22 +4,34 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/demius1992/Image-service/imageUploader/internal/interfaces"
 	"github.com/demius1992/Image-service/imageUploader/internal/models"
-	"io"
-	"time"
-
 	"github.com/google/uuid"
+	"io"
+	"net/http"
+	"time"
 )
+
+// KafkaService provides an interface for interacting with Kafka.
+type KafkaService interface {
+	SendMessage(ctx context.Context, id uuid.UUID) error
+	GetMessages() ([]string, error)
+}
+
+// S3ImageRepository provides an interface for interacting with s3Repository
+type S3ImageRepository interface {
+	UploadImage(id uuid.UUID, data io.ReadSeeker) (string, error)
+	GetImage(id uuid.UUID, variantName string) (*models.Image, error)
+	GetImageVariants(ids []string) ([]*models.Image, error)
+}
 
 // ImageService handles the image-related operations.
 type ImageService struct {
-	s3Repo   interfaces.S3Interractor
-	kafkaSrv interfaces.KafkaService
+	s3Repo   S3ImageRepository
+	kafkaSrv KafkaService
 }
 
 // NewImageService creates a new ImageService instance.
-func NewImageService(s3Repo interfaces.S3Interractor, kafkaSrv interfaces.KafkaService) *ImageService {
+func NewImageService(s3Repo S3ImageRepository, kafkaSrv KafkaService) *ImageService {
 	return &ImageService{
 		s3Repo:   s3Repo,
 		kafkaSrv: kafkaSrv,
@@ -27,7 +39,7 @@ func NewImageService(s3Repo interfaces.S3Interractor, kafkaSrv interfaces.KafkaS
 }
 
 // UploadImage uploads an image to S3 and publishes a message to Kafka.
-func (s *ImageService) UploadImage(image io.Reader, contentType string) (*models.Image, error) {
+func (s *ImageService) UploadImage(image io.ReadSeeker) (*models.Image, error) {
 	// Generate a unique ID for the image
 	id := uuid.New()
 
@@ -38,8 +50,10 @@ func (s *ImageService) UploadImage(image io.Reader, contentType string) (*models
 		return nil, fmt.Errorf("failed to read the image data: %v", err)
 	}
 
+	size := int64(imageData.Len())
+
 	// Upload the original image to S3
-	originalImageURL, err := s.s3Repo.UploadImage(id, contentType, imageData)
+	originalImageURL, err := s.s3Repo.UploadImage(id, image)
 	if err != nil {
 		return nil, fmt.Errorf("failed to upload the original image to S3: %v", err)
 	}
@@ -56,8 +70,8 @@ func (s *ImageService) UploadImage(image io.Reader, contentType string) (*models
 		CreatedAt:   time.Now().UTC().Format(time.RFC3339),
 		Name:        "original",
 		URL:         originalImageURL,
-		ContentType: contentType,
-		Size:        int64(imageData.Len()),
+		ContentType: http.DetectContentType(imageData.Bytes()),
+		Size:        size,
 		Content:     imageData.Bytes(),
 	}
 	return imageModel, nil
