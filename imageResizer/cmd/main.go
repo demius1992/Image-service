@@ -24,7 +24,7 @@ func main() {
 
 	// Create a new Kafka service
 	kafkaService := services.NewKafkaService(strings.Split(os.Getenv("KAFKA_BROKERS"), ","),
-		os.Getenv("KAFKA_TOPIC"), s3Repo)
+		os.Getenv("KAFKA_INPUT_TOPIC"), os.Getenv("KAFKA_OUTPUT_TOPIC"), s3Repo)
 
 	// Create a new Image service
 	imageService := services.NewImageService(kafkaService, s3Repo)

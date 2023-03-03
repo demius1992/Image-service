@@ -9,30 +9,32 @@ import (
 )
 
 type kafkaRepo struct {
-	writer *kafka.Writer
-	reader *kafka.Reader
-	topic  string
+	writer      *kafka.Writer
+	reader      *kafka.Reader
+	inputTopic  string
+	outputTopic string
 }
 
-func NewKafkaService(brokers []string, topic string) KafkaService {
+func NewKafkaService(brokers []string, inputTopic, outputTopic string) KafkaService {
 	w := &kafka.Writer{
 		Addr:                   kafka.TCP(brokers...),
-		Topic:                  topic,
+		Topic:                  outputTopic,
 		Balancer:               &kafka.LeastBytes{},
 		AllowAutoTopicCreation: true,
 	}
 	r := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:  brokers,
-		Topic:    topic,
+		Topic:    inputTopic,
 		GroupID:  "my-group",
 		MinBytes: 10e3, // 10KB
 		MaxBytes: 10e6, // 10MB
 	})
 
 	return &kafkaRepo{
-		writer: w,
-		reader: r,
-		topic:  topic,
+		writer:      w,
+		reader:      r,
+		inputTopic:  inputTopic,
+		outputTopic: outputTopic,
 	}
 }
 

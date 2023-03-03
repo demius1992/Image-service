@@ -10,31 +10,33 @@ import (
 )
 
 type kafkaRepo struct {
-	writer *kafka.Writer
-	reader *kafka.Reader
-	topic  string
-	s3Repo S3ImageRepository
+	writer      *kafka.Writer
+	reader      *kafka.Reader
+	inputTopic  string
+	outputTopic string
+	s3Repo      S3ImageRepository
 }
 
-func NewKafkaService(brokers []string, topic string, s3Repo S3ImageRepository) KafkaService {
+func NewKafkaService(brokers []string, inputTopic, outputTopic string, s3Repo S3ImageRepository) KafkaService {
 	w := &kafka.Writer{
 		Addr:                   kafka.TCP(brokers...),
-		Topic:                  topic,
+		Topic:                  outputTopic,
 		Balancer:               &kafka.LeastBytes{},
 		AllowAutoTopicCreation: true,
 	}
 	r := kafka.NewReader(kafka.ReaderConfig{
 		Brokers:  brokers,
-		Topic:    topic,
+		Topic:    inputTopic,
 		MinBytes: 10e3, // 10KB
 		MaxBytes: 10e6, // 10MB
 	})
 
 	return &kafkaRepo{
-		writer: w,
-		reader: r,
-		topic:  topic,
-		s3Repo: s3Repo,
+		writer:      w,
+		reader:      r,
+		inputTopic:  inputTopic,
+		outputTopic: outputTopic,
+		s3Repo:      s3Repo,
 	}
 }
 
@@ -100,7 +102,7 @@ func (r *kafkaRepo) listTopics() error {
 
 func (r *kafkaRepo) CreateTopics() error {
 	brokers := r.reader.Config().Brokers
-	topic := r.topic
+	topic := r.outputTopic
 
 	// Create topics in all Kafka nodes
 	for _, brokerAddr := range brokers {

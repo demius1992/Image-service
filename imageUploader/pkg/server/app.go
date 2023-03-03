@@ -19,7 +19,7 @@ import (
 
 type App struct {
 	httpServer    *http.Server
-	s3Repo        services.S3Interractor
+	s3Repo        services.S3ImageRepository
 	kafkaService  services.KafkaService
 	imageServicer handlers.ImageServicer
 }
@@ -33,7 +33,7 @@ func NewApp(cfg *config.Config) (*App, error) {
 	}
 
 	// Initialize the services
-	kafkaService := services.NewKafkaService(cfg.KafkaBrokers, cfg.KafkaTopic)
+	kafkaService := services.NewKafkaService(cfg.KafkaBrokers, cfg.KafkaInputTopic, cfg.KafkaOutputTopic)
 	imageService := services.NewImageService(s3Repo, kafkaService)
 
 	return &App{

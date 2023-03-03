@@ -16,13 +16,14 @@ func main() {
 	}
 
 	app, err := server.NewApp(&config.Config{
-		AwsRegion:    os.Getenv("S3_REGION"),
-		AwsBucket:    os.Getenv("S3_BUCKET"),
-		KafkaBrokers: strings.Split(os.Getenv("KAFKA_BROKERS"), ","),
-		KafkaTopic:   os.Getenv("KAFKA_TOPIC"),
-		AccessKey:    os.Getenv("ACCESS_KEY"),
-		SecretKey:    os.Getenv("SECRET_KEY"),
-		Endpoint:     os.Getenv("ENDPOINT"),
+		AwsRegion:        os.Getenv("S3_REGION"),
+		AwsBucket:        os.Getenv("S3_BUCKET"),
+		KafkaBrokers:     strings.Split(os.Getenv("KAFKA_BROKERS"), ","),
+		KafkaOutputTopic: os.Getenv("KAFKA_OUTPUT_TOPIC"),
+		KafkaInputTopic:  os.Getenv("KAFKA_INPUT_TOPIC"),
+		AccessKey:        os.Getenv("ACCESS_KEY"),
+		SecretKey:        os.Getenv("SECRET_KEY"),
+		Endpoint:         os.Getenv("ENDPOINT"),
 	})
 	if err != nil {
 		logrus.Fatalf("%s", err.Error())
